@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import 'add_event_screen.dart';
+
 class CalendarWidget extends StatefulWidget {
   const CalendarWidget({Key? key}) : super(key: key);
 
@@ -13,6 +15,7 @@ class _CalendarWidgetState extends State<CalendarWidget> {
   late DateTime _focusedDay;
   Map<DateTime, List<String>> _events = {};
   TextEditingController _eventController = TextEditingController();
+  late CalendarFormat _calendarFormat;
 
   @override
   void initState() {
@@ -20,6 +23,7 @@ class _CalendarWidgetState extends State<CalendarWidget> {
     super.initState();
     _selectedDate = DateTime.now();
     _focusedDay = _selectedDate;
+    _calendarFormat = CalendarFormat.month;
   //  _loadEvents();
   }
 
@@ -63,102 +67,136 @@ class _CalendarWidgetState extends State<CalendarWidget> {
   }
   @override
   Widget build(BuildContext context) {
+    List<String>? eventsForSelectedDate = _events[_selectedDate];
+
     return Column(
       children: [
-       /* Text(
-          'Selected Date: ${_selectedDate.toString()}',
-          style: const TextStyle(fontSize: 18),
-        ),
-        const SizedBox(height: 20),*/
         TableCalendar(
-          // Customize the calendar appearance and behavior as needed
-          // using various properties and call
-          // onDaySelected: _handleDaySelected,
-          onDaySelected: _selectDate,
-          focusedDay: _selectedDate,
-          firstDay: DateTime(DateTime.now().year - 1),
-          lastDay: DateTime(DateTime.now().year + 1),
-          selectedDayPredicate: (day) => _isSameDay(day, _selectedDate),
-          calendarStyle: const CalendarStyle(
-            selectedDecoration: BoxDecoration(
-              color: Colors.blue, // Customize the background color of the selected date
-              shape: BoxShape.circle,
+          calendarFormat: _calendarFormat,
+          focusedDay: _focusedDay,
+          firstDay: DateTime(2000),
+          lastDay: DateTime(2050),
+          selectedDayPredicate: (date) {
+            return isSameDay(_selectedDate, date);
+          },
+          onDaySelected: (selectedDay, focusedDay) {
+            setState(() {
+              _selectedDate = selectedDay;
+              _focusedDay = focusedDay;
+            });
+          },
+          onFormatChanged: (format) {
+            setState(() {
+              _calendarFormat = format;
+            });
+          },
+      calendarBuilders: CalendarBuilders(
+        defaultBuilder: (context, date, _) {
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedDate = date;
+                _focusedDay = date;
+              });
+            },
+            child: Center(
+              child: Text(
+                date.day.toString(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
             ),
-          ),
-          eventLoader: (day) => _events[day] ?? [],
-          calendarBuilders: CalendarBuilders(
-            markerBuilder: (context, date, events) {
-              if (events.isNotEmpty) {
-                return Positioned(
-                  bottom: 1,
+          );
+        },
+        selectedBuilder: (context, date, _) {
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedDate = date;
+                _focusedDay = date;
+              });
+            },
+            child: Container(
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blue,
+              ),
+              child: Center(
+                child: Text(
+                  date.day.toString(),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+        // Custom marker builder
+        markerBuilder: (context, date, events) {
+          return Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              if (events.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0), // Adjust the bottom margin as needed
                   child: Container(
                     width: 6,
                     height: 6,
                     decoration: const BoxDecoration(
-                      color: Colors.red, // Customize the color of the event marker
                       shape: BoxShape.circle,
+                      color: Colors.red,
                     ),
                   ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          onPressed: () {
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: const Text('Add Event'),
-                content: SingleChildScrollView(
-                  child: TextField(
-                    controller: _eventController,
-                    decoration: const InputDecoration(labelText: 'Event Name'),
-                    onChanged: (value) {
-                      // Handle event name change
-                    },
-                  ),
-
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      String eventName = _eventController.text;
-                      _addEvent(_selectedDate, eventName);
-                      _eventController.clear();
-                      Navigator.pop(context);
-                    },
-                    child: const Text('Add'),
-                  ),
-                ],
-              ),
-            );
+            ],
+          );
+        },
+      ),
+
+
+
+
+          eventLoader: (day) {
+            return _events[day] ?? [];
           },
-          child: const Text('Add Event'),
+
         ),
         Expanded(
           child: ListView.builder(
-            itemCount: _getEventsForDay(_selectedDate).length,
+            itemCount: _events[_selectedDate]?.length ?? 0,
             itemBuilder: (context, index) {
-              final event = _getEventsForDay(_selectedDate)[index];
+              final event = _events[_selectedDate]![index];
               return ListTile(
                 title: Text(event),
               );
             },
           ),
         ),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: _buildEventMarkers(),
+        FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddEventScreen(
+                  selectedDate: _selectedDate,
+                  onEventAdded: (event) {
+                    setState(() {
+                      if (_events.containsKey(_selectedDate)) {
+                        _events[_selectedDate]!.add(event);
+                      } else {
+                        _events[_selectedDate] = [event];
+                      }
+                    });
+                  },
+                ),
+              ),
+            );
+          },
+          child: Icon(Icons.add),
         ),
       ],
     );
